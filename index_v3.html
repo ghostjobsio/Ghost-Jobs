@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GhostCheck — Ghost Job Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--border:#2a2a3a;--accent:#ff3c3c;--accent2:#ff8c42;--text:#f0f0f5;--muted:#6b6b80;--ghost:#4a4a6a;--green:#3cffa0;--yellow:#ffd23c; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,60,60,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,60,60,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+  .container{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+  header{padding:48px 0 32px;border-bottom:1px solid var(--border);margin-bottom:48px}
+  .logo-row{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+  .logo{font-family:'Bebas Neue',sans-serif;font-size:64px;letter-spacing:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+  .logo-tag{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.3);padding:3px 8px;border-radius:3px;letter-spacing:2px;text-transform:uppercase}
+  .tagline{color:var(--muted);font-size:15px;font-weight:300}
+  .tagline span{color:var(--accent);font-weight:500}
+  .how-it-works{display:flex;gap:24px;margin-bottom:36px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap}
+  .how-item{display:flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .how-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot-red{background:var(--accent)}.dot-yellow{background:var(--yellow)}.dot-green{background:var(--green)}
+  .search-section{margin-bottom:32px}
+  .search-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--text);margin-bottom:16px}
+  .search-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end}
+  .field-group{display:flex;flex-direction:column;gap:6px}
+  .field-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+  input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:10px 14px;border-radius:6px;outline:none;transition:border-color 0.2s;width:100%}
+  input:focus{border-color:var(--accent)}
+  input::placeholder{color:var(--ghost)}
+  .btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;padding:10px 28px;border-radius:6px;cursor:pointer;transition:opacity 0.2s,transform 0.1s;white-space:nowrap;height:42px}
+  .btn:hover{opacity:0.9;transform:translateY(-1px)}.btn:active{transform:translateY(0)}.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+  .stats-bar{display:flex;gap:24px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:24px;flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat-value{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;line-height:1}
+  .stat-value.red{color:var(--accent)}.stat-value.yellow{color:var(--yellow)}.stat-value.green{color:var(--green)}.stat-value.white{color:var(--text)}
+  .stat-label{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase}
+  .results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+  .results-title{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+  .filter-tabs{display:flex;gap:8px}
+  .tab{font-family:'DM Mono',monospace;font-size:11px;padding:5px 12px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.2s}
+  .tab.active{background:rgba(255,60,60,0.15);border-color:var(--accent);color:var(--accent)}
+  .tab:hover:not(.active){border-color:var(--ghost);color:var(--text)}
+  .job-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 24px;margin-bottom:12px;transition:border-color 0.2s,transform 0.15s;animation:fadeIn 0.3s ease forwards;opacity:0}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .job-card:hover{border-color:var(--ghost);transform:translateY(-1px)}
+  .job-card.ghost-high{border-left:3px solid var(--accent)}.job-card.ghost-medium{border-left:3px solid var(--yellow)}.job-card.ghost-low{border-left:3px solid var(--green)}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:16px}
+  .job-title{font-size:16px;font-weight:600;color:var(--text);line-height:1.3}
+  .ghost-badge{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+  .badge-high{background:rgba(255,60,60,0.15);color:var(--accent);border:1px solid rgba(255,60,60,0.3)}
+  .badge-medium{background:rgba(255,210,60,0.15);color:var(--yellow);border:1px solid rgba(255,210,60,0.3)}
+  .badge-low{background:rgba(60,255,160,0.1);color:var(--green);border:1px solid rgba(60,255,160,0.2)}
+  .card-meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+  .meta-item{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .meta-item .dot{width:4px;height:4px;border-radius:50%;background:var(--ghost);display:inline-block}
+  .days-posted{font-family:'DM Mono',monospace;font-size:12px;font-weight:500}
+  .days-high{color:var(--accent)}.days-medium{color:var(--yellow)}.days-low{color:var(--green)}
+  .card-reason{font-size:12px;color:var(--muted);background:var(--surface2);border-radius:4px;padding:8px 12px;border-left:2px solid var(--ghost);line-height:1.5}
+  .view-link{display:inline-block;margin-top:10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);text-decoration:none;letter-spacing:1px;text-transform:uppercase;transition:opacity 0.2s}
+  .view-link:hover{opacity:0.7}
+  .empty-state{text-align:center;padding:80px 20px;color:var(--muted)}
+  .empty-state .ghost-icon{font-size:56px;margin-bottom:16px;opacity:0.4}
+  .empty-state h3{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--ghost);margin-bottom:8px}
+  .empty-state p{font-size:14px;line-height:1.6}
+  .loading{text-align:center;padding:60px;color:var(--muted)}
+  .loading-text{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);letter-spacing:2px}
+  .loading-bar{width:200px;height:2px;background:var(--border);margin:16px auto 0;border-radius:2px;overflow:hidden;position:relative}
+  .loading-bar::after{content:'';position:absolute;left:-50%;top:0;width:50%;height:100%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:loading 1.2s infinite}
+  @keyframes loading{from{left:-50%}to{left:150%}}
+  .error-msg{background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.25);border-radius:8px;padding:16px 20px;color:var(--accent);font-family:'DM Mono',monospace;font-size:13px;margin-bottom:24px}
+  footer{margin-top:64px;padding:24px 0;border-top:1px solid var(--border);text-align:center;color:var(--ghost);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px}
+  footer span{color:var(--accent)}
+  @media(max-width:768px){.search-grid{grid-template-columns:1fr 1fr}.search-grid .btn{grid-column:span 2}.logo{font-size:48px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo-row">
+      <div class="logo">GhostCheck</div>
+      <div class="logo-tag">Beta</div>
+    </div>
+    <p class="tagline">Detect <span>ghost job postings</span> before you waste your time applying.</p>
+  </header>
+
+  <div class="how-it-works">
+    <div class="how-item"><div class="how-dot dot-red"></div>60+ days posted = High Risk Ghost</div>
+    <div class="how-item"><div class="how-dot dot-yellow"></div>30 to 59 days = Medium Risk</div>
+    <div class="how-item"><div class="how-dot dot-green"></div>Under 30 days = Looks Legit</div>
+  </div>
+
+  <div class="search-section">
+    <div class="search-title">HUNT FOR GHOSTS</div>
+    <div class="search-grid">
+      <div class="field-group">
+        <label class="field-label">Job Title</label>
+        <input type="text" id="jobTitle" placeholder="e.g. Data Analyst" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Company</label>
+        <input type="text" id="company" placeholder="e.g. Google" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Industry / Keywords</label>
+        <input type="text" id="industry" placeholder="e.g. Healthcare, Finance" />
+      </div>
+      <button class="btn" id="searchBtn" onclick="search()">SEARCH</button>
+    </div>
+  </div>
+
+  <div id="errorMsg" class="error-msg" style="display:none"></div>
+
+  <div id="statsBar" class="stats-bar" style="display:none">
+    <div class="stat"><div class="stat-value white" id="statTotal">0</div><div class="stat-label">Jobs Found</div></div>
+    <div class="stat"><div class="stat-value red" id="statHigh">0</div><div class="stat-label">High Risk Ghost</div></div>
+    <div class="stat"><div class="stat-value yellow" id="statMedium">0</div><div class="stat-label">Medium Risk</div></div>
+    <div class="stat"><div class="stat-value green" id="statLow">0</div><div class="stat-label">Looks Legit</div></div>
+    <div class="stat"><div class="stat-value" style="color:var(--accent2)" id="statAvgDays">0</div><div class="stat-label">Avg Days Posted</div></div>
+  </div>
+
+  <div id="resultsHeader" class="results-header" style="display:none">
+    <div class="results-title">Results</div>
+    <div class="filter-tabs">
+      <button class="tab active" onclick="filterResults('all', this)">All</button>
+      <button class="tab" onclick="filterResults('high', this)">👻 High Risk</button>
+      <button class="tab" onclick="filterResults('medium', this)">⚠️ Medium</button>
+      <button class="tab" onclick="filterResults('low', this)">✅ Legit</button>
+    </div>
+  </div>
+
+  <div id="results"></div>
+  <footer>Built with <span>GhostCheck</span> — Because fake jobs waste real time.</footer>
+</div>
+
+<script>
+  let allJobs = [];
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.style.display = 'block';
+    el.textContent = msg;
+  }
+
+  function getDaysPosted(created) {
+    if (!created) return null;
+    return Math.floor((new Date() - new Date(created)) / (1000 * 60 * 60 * 24));
+  }
+
+  function getGhostRisk(days) {
+    if (days === null) return { level: 'low', label: 'UNKNOWN', class: 'ghost-low', badgeClass: 'badge-low', daysClass: 'days-low' };
+    if (days >= 60) return { level: 'high', label: '👻 HIGH RISK', class: 'ghost-high', badgeClass: 'badge-high', daysClass: 'days-high' };
+    if (days >= 30) return { level: 'medium', label: '⚠️ MEDIUM RISK', class: 'ghost-medium', badgeClass: 'badge-medium', daysClass: 'days-medium' };
+    return { level: 'low', label: '✅ LOOKS LEGIT', class: 'ghost-low', badgeClass: 'badge-low', daysClass: 'days-low' };
+  }
+
+  function getReason(days) {
+    if (days === null) return 'No posting date available.';
+    if (days >= 90) return `Posted ${days} days ago. Extremely high ghost job signal — most roles are filled within 45 days.`;
+    if (days >= 60) return `Posted ${days} days ago. Strong ghost job indicator — proceed with caution.`;
+    if (days >= 30) return `Posted ${days} days ago. Worth applying but the role may already have internal candidates.`;
+    return `Posted ${days} days ago. Fresh posting — this looks like an active, legitimate role.`;
+  }
+
+  async function search() {
+    const title = document.getElementById('jobTitle').value.trim();
+    const company = document.getElementById('company').value.trim();
+    const industry = document.getElementById('industry').value.trim();
+
+    if (!title && !company && !industry) {
+      showError('Enter at least one search term to find jobs.');
+      return;
+    }
+
+    document.getElementById('errorMsg').style.display = 'none';
+    document.getElementById('searchBtn').disabled = true;
+    document.getElementById('statsBar').style.display = 'none';
+    document.getElementById('resultsHeader').style.display = 'none';
+    document.getElementById('results').innerHTML = '<div class="loading"><div class="loading-text">SCANNING FOR GHOSTS...</div><div class="loading-bar"></div></div>';
+
+    try {
+      const url = `/.netlify/functions/search?title=${encodeURIComponent(title)}&company=${encodeURIComponent(company)}&industry=${encodeURIComponent(industry)}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Search failed');
+      if (!data.results) throw new Error(data.exception || 'No results returned');
+
+      allJobs = (data.results || []).map(job => {
+        const days = getDaysPosted(job.created);
+        return { ...job, days, risk: getGhostRisk(days) };
+      });
+
+      updateStats();
+      renderJobs('all');
+    } catch (err) {
+      document.getElementById('results').innerHTML = '';
+      showError('Search failed: ' + err.message);
+    } finally {
+      document.getElementById('searchBtn').disabled = false;
+    }
+  }
+
+  function updateStats() {
+    const high = allJobs.filter(j => j.risk.level === 'high').length;
+    const medium = allJobs.filter(j => j.risk.level === 'medium').length;
+    const low = allJobs.filter(j => j.risk.level === 'low').length;
+    const validDays = allJobs.filter(j => j.days !== null).map(j => j.days);
+    const avgDays = validDays.length ? Math.round(validDays.reduce((a,b) => a+b, 0) / validDays.length) : 0;
+    document.getElementById('statTotal').textContent = allJobs.length;
+    document.getElementById('statHigh').textContent = high;
+    document.getElementById('statMedium').textContent = medium;
+    document.getElementById('statLow').textContent = low;
+    document.getElementById('statAvgDays').textContent = avgDays;
+    document.getElementById('statsBar').style.display = 'flex';
+  }
+
+  function filterResults(filter, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderJobs(filter);
+  }
+
+  function renderJobs(filter) {
+    const filtered = filter === 'all' ? allJobs : allJobs.filter(j => j.risk.level === filter);
+    const container = document.getElementById('results');
+    document.getElementById('resultsHeader').style.display = 'flex';
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="ghost-icon">👻</div><h3>' + (filter === 'all' ? 'NO JOBS FOUND' : 'NONE IN THIS CATEGORY') + '</h3><p>' + (filter === 'all' ? 'Try broader search terms.' : 'Try a different filter.') + '</p></div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map((job, i) => `
+      <div class="job-card ${job.risk.class}" style="animation-delay:${i*0.05}s">
+        <div class="card-top">
+          <div class="job-title">${job.title || 'Untitled Role'}</div>
+          <div class="ghost-badge ${job.risk.badgeClass}">${job.risk.label}</div>
+        </div>
+        <div class="card-meta">
+          ${job.company?.display_name ? `<div class="meta-item"><span class="dot"></span>${job.company.display_name}</div>` : ''}
+          ${job.location?.display_name ? `<div class="meta-item"><span class="dot"></span>${job.location.display_name}</div>` : ''}
+          ${job.days !== null ? `<div class="meta-item"><span class="dot"></span><span class="${job.risk.daysClass} days-posted">${job.days} days posted</span></div>` : ''}
+          ${job.salary_min ? `<div class="meta-item"><span class="dot"></span>$${Math.round(job.salary_min/1000)}k${job.salary_max ? ` to $${Math.round(job.salary_max/1000)}k` : '+'}</div>` : ''}
+        </div>
+        <div class="card-reason">${getReason(job.days)}</div>
+        ${job.redirect_url ? `<a class="view-link" href="${job.redirect_url}" target="_blank">VIEW POSTING →</a>` : ''}
+      </div>
+    `).join('');
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+</script>
+</body>
+</html>
