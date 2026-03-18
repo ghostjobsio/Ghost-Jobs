@@ -1,17 +1,35 @@
 exports.handler = async function(event) {
-  const { query } = event.queryStringParameters || {};
-  if (!query) return { statusCode: 400, body: JSON.stringify({ error: "Missing query" }) };
+  const params = event.queryStringParameters || {};
+  const title = params.title || '';
+  const company = params.company || '';
+  const industry = params.industry || '';
 
   const appId = process.env.ADZUNA_APP_ID;
   const apiKey = process.env.ADZUNA_API_KEY;
 
-  const url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${appId}&app_key=${apiKey}&results_per_page=25&what=${encodeURIComponent(query)}&content-type=application/json`;
+  if (!appId || !apiKey) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "API keys not configured on server." })
+    };
+  }
+
+  let whatParam = title || industry || 'jobs';
+  let url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${appId}&app_key=${apiKey}&results_per_page=25&content-type=application/json&what=${encodeURIComponent(whatParam)}`;
+  if (company) url += `&company=${encodeURIComponent(company)}`;
 
   try {
     const response = await fetch(url);
     const data = await response.json();
-    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) };
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify(data)
+    };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Failed to fetch: " + err.message })
+    };
   }
 };
