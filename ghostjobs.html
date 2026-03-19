@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Jobs — Detect Ghost Job Postings</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#07070f; --bg2:#0d0d1a; --surface:#111120; --surface2:#181830;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+    --accent:#ff4500; --accent2:#ff6a1a; --accent3:#ffaa55;
+    --text:#f0f0f8; --text2:#a0a0c0; --faint:#32324a;
+    --green:#00d48a; --yellow:#f5c842; --red:#ff3c3c;
+  }
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+  body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,69,0,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,69,0,0.025) 1px,transparent 1px);background-size:48px 48px}
+
+  /* ── NAV ── */
+  nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:rgba(7,7,15,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+  .nav-left{display:flex;align-items:center;gap:24px}
+  .nav-brand{display:flex;align-items:center;gap:10px;cursor:pointer;text-decoration:none}
+  .nav-brand-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .nav-brand-name{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-0.3px}
+  .nav-brand-name span{color:var(--accent)}
+  .nav-links{display:flex;align-items:center;gap:4px;list-style:none}
+  .nav-links a{font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;padding:6px 12px;border-radius:6px;transition:all 0.15s;cursor:pointer}
+  .nav-links a:hover{color:var(--text);background:rgba(255,255,255,0.05)}
+  .nav-links a.active{color:var(--text);background:rgba(255,255,255,0.07)}
+  .nav-right{display:flex;align-items:center;gap:10px}
+  .coffee-nav{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#f5a623;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.25);padding:6px 14px;border-radius:6px;text-decoration:none;transition:all 0.15s;white-space:nowrap}
+  .coffee-nav:hover{background:rgba(245,166,35,0.18);transform:translateY(-1px)}
+  .nav-cta{font-size:13px;font-weight:600;color:white;background:var(--accent);padding:7px 16px;border-radius:6px;text-decoration:none;transition:all 0.15s;cursor:pointer}
+  .nav-cta:hover{background:var(--accent2)}
+
+  /* ── PAGES ── */
+  .page{display:none;padding-top:60px;min-height:100vh;position:relative;z-index:1}
+  .page.active{display:block}
+
+  /* ── SHARED ── */
+  .wrap{max-width:1080px;margin:0 auto;padding:0 32px}
+  .label{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+  .label::before{content:'';width:14px;height:1px;background:var(--accent)}
+  .section-title{font-size:clamp(26px,4vw,38px);font-weight:800;color:var(--text);letter-spacing:-0.8px;line-height:1.15;margin-bottom:12px}
+  .section-sub{font-size:15px;font-weight:400;color:var(--text2);max-width:520px;line-height:1.75;margin-bottom:56px}
+  .divider{height:1px;background:var(--border);margin:0 32px}
+
+  /* ── HOME ── */
+  .hero{min-height:calc(100vh - 60px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 32px 60px;position:relative;overflow:hidden}
+  .hero-orb{position:absolute;width:700px;height:700px;background:radial-gradient(circle,rgba(255,69,0,0.07) 0%,transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+  .hero-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(255,69,0,0.1);border:1px solid rgba(255,69,0,0.2);border-radius:100px;padding:6px 16px;font-size:12px;font-weight:600;color:var(--accent2);letter-spacing:0.5px;margin-bottom:32px}
+  .hero-pill-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+  .hero-h1{font-size:clamp(42px,7vw,78px);font-weight:800;letter-spacing:-2px;line-height:1.05;margin-bottom:24px;color:var(--text)}
+  .hero-h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero-p{font-size:16px;font-weight:400;color:var(--text2);max-width:500px;line-height:1.75;margin-bottom:40px}
+  .hero-p strong{color:var(--text);font-weight:600}
+  .hero-actions{display:flex;gap:12px;align-items:center;margin-bottom:64px}
+  .btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;padding:11px 28px;border-radius:8px;border:none;cursor:pointer;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+  .btn-fill{background:var(--accent);color:white}
+  .btn-fill:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,69,0,0.3)}
+  .btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border2)!important}
+  .btn-outline:hover{color:var(--text);background:rgba(255,255,255,0.04)}
+  .hero-stats{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .hero-stat{padding:20px 40px;border-right:1px solid var(--border);text-align:center}
+  .hero-stat:last-child{border-right:none}
+  .hero-stat-n{font-size:26px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:4px}
+  .hero-stat-l{font-size:11px;font-weight:500;color:var(--text2);letter-spacing:0.5px}
+  .home-section{padding:80px 0}
+  .risk-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:64px}
+  .risk-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;transition:transform 0.2s,box-shadow 0.2s}
+  .risk-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+  .risk-card-top{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .risk-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .dot-red{background:var(--red)}.dot-yellow{background:var(--yellow)}.dot-green{background:var(--green)}
+  .risk-card-badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:4px}
+  .badge-red{background:rgba(255,60,60,0.12);color:var(--red);border:1px solid rgba(255,60,60,0.2)}
+  .badge-yellow{background:rgba(245,200,66,0.12);color:var(--yellow);border:1px solid rgba(245,200,66,0.2)}
+  .badge-green{background:rgba(0,212,138,0.1);color:var(--green);border:1px solid rgba(0,212,138,0.18)}
+  .risk-card h3{font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-0.3px}
+  .risk-card p{font-size:13px;color:var(--text2);line-height:1.7}
+  .features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;background:var(--border);border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+  .feat{background:var(--surface);padding:28px 32px;display:flex;gap:18px;align-items:flex-start;transition:background 0.15s}
+  .feat:hover{background:var(--surface2)}
+  .feat-icon{width:40px;height:40px;flex-shrink:0;background:rgba(255,69,0,0.1);border:1px solid rgba(255,69,0,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .feat h4{font-size:15px;font-weight:700;color:var(--text);margin-bottom:5px;letter-spacing:-0.2px}
+  .feat p{font-size:13px;color:var(--text2);line-height:1.65}
+
+  /* ── SEARCH ── */
+  .search-wrap{padding:56px 32px;max-width:1080px;margin:0 auto}
+  .search-fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase}
+  input,select{background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;padding:10px 14px;border-radius:7px;outline:none;transition:border-color 0.15s;width:100%;height:42px}
+  input:focus,select:focus{border-color:var(--accent)}
+  input::placeholder{color:var(--faint)}
+  select option{background:var(--bg2)}
+  .search-btn{height:42px;padding:0 24px;background:var(--accent);color:white;border:none;border-radius:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;transition:all 0.15s;white-space:nowrap}
+  .search-btn:hover{background:var(--accent2);box-shadow:0 4px 16px rgba(255,69,0,0.3)}
+  .search-btn:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+
+  /* Work type filter row */
+  .filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+  .filter-bar-label{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
+  .work-tabs{display:flex;gap:6px}
+  .wtab{font-size:12px;font-weight:600;padding:6px 16px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s}
+  .wtab.active{background:rgba(255,69,0,0.12);border-color:rgba(255,69,0,0.3);color:var(--accent)}
+  .wtab:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--text)}
+
+  .stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:var(--border);border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:20px}
+  .stat-cell{background:var(--surface);padding:16px 20px;transition:background 0.15s}
+  .stat-cell:hover{background:var(--surface2)}
+  .stat-n{font-size:24px;font-weight:800;line-height:1;margin-bottom:4px}
+  .sn-white{color:var(--text)}.sn-red{color:var(--red)}.sn-yellow{color:var(--yellow)}.sn-green{color:var(--green)}.sn-orange{color:var(--accent2)}
+  .stat-l{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase}
+  .result-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .result-count{font-size:12px;font-weight:500;color:var(--text2)}
+  .tabs{display:flex;gap:6px}
+  .tab{font-size:12px;font-weight:600;padding:6px 14px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s}
+  .tab.active{background:rgba(255,69,0,0.12);border-color:rgba(255,69,0,0.3);color:var(--accent)}
+  .tab:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--text)}
+  .job-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 26px;margin-bottom:10px;animation:rise 0.25s ease forwards;opacity:0;transition:all 0.15s}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .job-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.25)}
+  .job-card.lvl-high{border-left:3px solid var(--red)}.job-card.lvl-medium{border-left:3px solid var(--yellow)}.job-card.lvl-low{border-left:3px solid var(--green)}
+  .card-row1{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px}
+  .card-title{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-0.2px;line-height:1.3}
+  .card-badges{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+  .card-badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:5px}
+  .cb-high{background:rgba(255,60,60,0.1);color:var(--red);border:1px solid rgba(255,60,60,0.2)}
+  .cb-medium{background:rgba(245,200,66,0.1);color:var(--yellow);border:1px solid rgba(245,200,66,0.2)}
+  .cb-low{background:rgba(0,212,138,0.08);color:var(--green);border:1px solid rgba(0,212,138,0.15)}
+  .cb-remote{background:rgba(100,100,255,0.1);color:#8888ff;border:1px solid rgba(100,100,255,0.2)}
+  .cb-hybrid{background:rgba(255,200,0,0.1);color:#ffcc44;border:1px solid rgba(255,200,0,0.2)}
+  .cb-inperson{background:rgba(0,200,150,0.1);color:#00c896;border:1px solid rgba(0,200,150,0.2)}
+  .card-meta{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px}
+  .cm{font-size:12px;font-weight:400;color:var(--text2);display:flex;align-items:center;gap:6px}
+  .cm-sep{width:3px;height:3px;border-radius:50%;background:var(--faint)}
+  .cm-days{font-weight:600}.cm-days.high{color:var(--red)}.cm-days.medium{color:var(--yellow)}.cm-days.low{color:var(--green)}
+  .card-reason{font-size:13px;color:var(--text2);background:var(--bg2);border-radius:6px;padding:10px 14px;border-left:2px solid var(--faint);line-height:1.65}
+  .card-link{display:inline-flex;align-items:center;gap:5px;margin-top:12px;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;transition:opacity 0.15s}
+  .card-link:hover{opacity:0.7}
+  .state{text-align:center;padding:80px 20px}
+  .state-em{font-size:52px;margin-bottom:16px;opacity:0.3}
+  .state-h{font-size:22px;font-weight:700;color:var(--faint);letter-spacing:-0.3px;margin-bottom:8px}
+  .state-p{font-size:14px;color:var(--text2)}
+  .loading-track{width:200px;height:2px;background:var(--border2);margin:20px auto 0;border-radius:2px;overflow:hidden;position:relative}
+  .loading-track::after{content:'';position:absolute;left:-50%;top:0;width:50%;height:100%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:sweep 1.1s infinite}
+  @keyframes sweep{from{left:-50%}to{left:150%}}
+  .err-box{background:rgba(255,60,60,0.07);border:1px solid rgba(255,60,60,0.18);border-radius:8px;padding:13px 18px;color:var(--red);font-size:13px;font-weight:500;margin-bottom:20px}
+  .success-box{background:rgba(0,212,138,0.07);border:1px solid rgba(0,212,138,0.18);border-radius:8px;padding:13px 18px;color:var(--green);font-size:13px;font-weight:500;margin-bottom:20px}
+
+  /* ── FAQ ── */
+  .faq-wrap{max-width:720px;margin:0 auto;padding:56px 32px 80px}
+  .faq-item{border-bottom:1px solid var(--border)}
+  .faq-item:first-child{border-top:1px solid var(--border)}
+  .faq-q{display:flex;justify-content:space-between;align-items:center;padding:22px 0;cursor:pointer;gap:16px;font-size:15px;font-weight:600;color:var(--text);transition:color 0.15s;letter-spacing:-0.2px;user-select:none}
+  .faq-q:hover{color:var(--accent)}
+  .faq-chevron{font-size:20px;color:var(--accent);flex-shrink:0;transition:transform 0.2s;font-style:normal}
+  .faq-item.open .faq-chevron{transform:rotate(45deg)}
+  .faq-a{font-size:14px;font-weight:400;color:var(--text2);line-height:1.8;padding-bottom:22px;display:none}
+  .faq-item.open .faq-a{display:block}
+  .faq-a strong{color:var(--text);font-weight:600}
+
+  /* ── CONTACT ── */
+  .contact-wrap{max-width:1040px;margin:0 auto;padding:56px 32px 80px}
+  .contact-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:40px;align-items:start;margin-bottom:60px}
+  .contact-cards{display:flex;flex-direction:column;gap:12px}
+  .contact-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;display:flex;gap:16px;align-items:flex-start;transition:border-color 0.15s}
+  .contact-card:hover{border-color:var(--border2)}
+  .cc-icon{width:38px;height:38px;flex-shrink:0;background:rgba(255,69,0,0.1);border:1px solid rgba(255,69,0,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .cc-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-0.2px}
+  .cc-text{font-size:13px;color:var(--text2);line-height:1.6}
+  .cc-text a{color:var(--accent);text-decoration:none}
+  .cc-text a:hover{text-decoration:underline}
+  .contact-form-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px}
+  .form-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-0.3px}
+  .form-subtitle{font-size:13px;color:var(--text2);margin-bottom:24px}
+  .form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .form-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase}
+  .form-inp,.form-sel,.form-ta{background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;padding:10px 14px;border-radius:7px;outline:none;transition:border-color 0.15s;width:100%}
+  .form-inp{height:42px}.form-sel{height:42px}
+  .form-ta{min-height:110px;resize:vertical}
+  .form-inp:focus,.form-sel:focus,.form-ta:focus{border-color:var(--accent)}
+  .form-inp::placeholder,.form-ta::placeholder{color:var(--faint)}
+  .form-sel option{background:var(--bg2)}
+  .form-submit{margin-top:8px;width:100%;height:44px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;transition:all 0.15s}
+  .form-submit:hover{background:var(--accent2);box-shadow:0 4px 16px rgba(255,69,0,0.3)}
+
+  /* Join team section */
+  .join-section{border-top:1px solid var(--border);padding-top:56px}
+  .join-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:40px;align-items:start;margin-top:40px}
+  .join-info h3{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.3px;margin-bottom:12px}
+  .join-info p{font-size:14px;color:var(--text2);line-height:1.75;margin-bottom:16px}
+  .join-role{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+  .join-role-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+  .join-role-name{font-size:14px;font-weight:600;color:var(--text)}
+  .join-role-type{font-size:12px;color:var(--text2);margin-left:auto;font-family:'JetBrains Mono',monospace}
+
+  /* ── FOOTER ── */
+  footer{position:relative;z-index:1;background:var(--surface);border-top:1px solid var(--border);padding:48px 48px 28px}
+  .footer-top{display:grid;grid-template-columns:2fr 1fr 1fr;gap:48px;max-width:1080px;margin:0 auto 36px}
+  .footer-brand-name{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.3px;margin-bottom:10px}
+  .footer-brand-name span{color:var(--accent)}
+  .footer-tagline{font-size:13px;color:var(--text2);line-height:1.65;max-width:260px}
+  .footer-col-h{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px}
+  .footer-links{list-style:none;display:flex;flex-direction:column;gap:8px}
+  .footer-links a{font-size:13px;color:var(--text2);text-decoration:none;transition:color 0.15s;cursor:pointer}
+  .footer-links a:hover{color:var(--text)}
+  .footer-bottom{max-width:1080px;margin:0 auto;padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .footer-copy{font-size:12px;color:var(--faint)}
+  .footer-copy span{color:var(--accent2)}
+  .footer-coffee{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#f5a623;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.2);padding:7px 16px;border-radius:6px;text-decoration:none;transition:all 0.15s}
+  .footer-coffee:hover{background:rgba(245,166,35,0.18);transform:translateY(-1px)}
+
+  @media(max-width:860px){
+    nav{padding:0 16px}
+    .nav-links{display:none}
+    .hero{padding:60px 20px 40px}
+    .risk-cards{grid-template-columns:1fr}
+    .features-grid{grid-template-columns:1fr}
+    .search-fields{grid-template-columns:1fr 1fr}
+    .search-fields .search-btn{grid-column:span 2;width:100%}
+    .stats-row{grid-template-columns:repeat(3,1fr)}
+    .contact-grid,.join-grid{grid-template-columns:1fr}
+    .footer-top{grid-template-columns:1fr;gap:28px}
+    .hero-stats{flex-direction:column}
+    .hero-stat{border-right:none;border-bottom:1px solid var(--border)}
+    .hero-stat:last-child{border-bottom:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="nav-left">
+    <a class="nav-brand" onclick="go('home')">
+      <div class="nav-brand-icon">👻</div>
+      <div class="nav-brand-name">Ghost<span>Jobs</span></div>
+    </a>
+    <ul class="nav-links">
+      <li><a onclick="go('home')" id="nl-home" class="active">Home</a></li>
+      <li><a onclick="go('search')" id="nl-search">Search</a></li>
+      <li><a onclick="go('faq')" id="nl-faq">FAQ</a></li>
+      <li><a onclick="go('contact')" id="nl-contact">Contact</a></li>
+    </ul>
+  </div>
+  <div class="nav-right">
+    <a href="https://buymeacoffee.com/ghostjobsio" target="_blank" class="coffee-nav">☕ Buy Us a Coffee</a>
+    <a onclick="go('search')" class="nav-cta">Hunt Now</a>
+  </div>
+</nav>
+
+<!-- ══ HOME ══ -->
+<div class="page active" id="pg-home">
+  <div class="hero">
+    <div class="hero-orb"></div>
+    <div class="hero-pill"><div class="hero-pill-dot"></div>Free Ghost Job Detection</div>
+    <h1 class="hero-h1">Stop Wasting Applications<br>on <em>Ghost Jobs.</em></h1>
+    <p class="hero-p"><strong>1 in 5 job postings are never meant to be filled.</strong> Ghost Jobs scans live listings and flags the ones that have been sitting too long — so you focus your energy where it actually counts.</p>
+    <div class="hero-actions">
+      <button class="btn btn-fill" onclick="go('search')">Start Searching →</button>
+      <a class="btn btn-outline" onclick="go('faq')">How It Works</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="hero-stat-n">1 in 5</div><div class="hero-stat-l">Jobs Are Ghosts</div></div>
+      <div class="hero-stat"><div class="hero-stat-n">30+</div><div class="hero-stat-l">Days = Red Flag</div></div>
+      <div class="hero-stat"><div class="hero-stat-n">Free</div><div class="hero-stat-l">Always</div></div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="wrap home-section">
+    <div class="label">Risk Levels</div>
+    <h2 class="section-title">How We Score Every Posting</h2>
+    <p class="section-sub">Every job is scored by how long it has been posted. The longer it sits unfilled, the higher the ghost risk.</p>
+    <div class="risk-cards">
+      <div class="risk-card"><div class="risk-card-top"><div class="risk-dot dot-red"></div><div class="risk-card-badge badge-red">👻 High Risk</div></div><h3>60+ Days Posted</h3><p>Extremely high chance this role is a ghost. Most legitimate positions are filled within 45 days. This company may be building a pipeline or the role may be indefinitely stalled.</p></div>
+      <div class="risk-card"><div class="risk-card-top"><div class="risk-dot dot-yellow"></div><div class="risk-card-badge badge-yellow">⚠️ Medium Risk</div></div><h3>30 to 59 Days Posted</h3><p>Proceed with caution. The role may already have internal candidates or be stuck in a slow hiring process with no real urgency to fill it externally.</p></div>
+      <div class="risk-card"><div class="risk-card-top"><div class="risk-dot dot-green"></div><div class="risk-card-badge badge-green">✅ Looks Legit</div></div><h3>Under 30 Days Posted</h3><p>Fresh posting with strong signals of active hiring intent. Apply with confidence — this company is actively working to fill this role right now.</p></div>
+    </div>
+    <div class="label">Features</div>
+    <h2 class="section-title">Built for Smarter Job Searching</h2>
+    <p class="section-sub">Everything you need to stop wasting applications on roles that will never be filled.</p>
+    <div class="features-grid">
+      <div class="feat"><div class="feat-icon">🔍</div><div><h4>Search by Title, Company, or Industry</h4><p>Search across thousands of live job postings and filter by title, company, keywords, and location all at once.</p></div></div>
+      <div class="feat"><div class="feat-icon">📊</div><div><h4>Instant Risk Scoring</h4><p>Every result is automatically scored and labeled so you know the ghost risk of every role at a glance.</p></div></div>
+      <div class="feat"><div class="feat-icon">🏢</div><div><h4>Company Ghost Score</h4><p>See patterns of stale postings across an entire organization — a habit of ghost jobs is a red flag for the whole company.</p></div></div>
+      <div class="feat"><div class="feat-icon">🏠</div><div><h4>Remote, Hybrid, In-Person Filter</h4><p>Filter results by work type so you only see the jobs that actually match how you want to work.</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SEARCH ══ -->
+<div class="page" id="pg-search">
+  <div class="search-wrap">
+    <div style="margin-bottom:32px">
+      <div class="label">Ghost Job Detector</div>
+      <h1 class="section-title">Hunt for Ghost Jobs</h1>
+    </div>
+
+    <div class="search-fields">
+      <div class="field"><div class="field-lbl">Job Title</div><input type="text" id="f-title" placeholder="e.g. Data Analyst" /></div>
+      <div class="field"><div class="field-lbl">Company</div><input type="text" id="f-company" placeholder="e.g. Google" /></div>
+      <div class="field"><div class="field-lbl">Industry / Keywords</div><input type="text" id="f-industry" placeholder="e.g. Healthcare" /></div>
+      <div class="field"><div class="field-lbl">Location</div><input type="text" id="f-location" placeholder="e.g. New York" /></div>
+      <button class="search-btn" id="searchBtn" onclick="doSearch()">Search</button>
+    </div>
+
+    <div id="errBox" class="err-box" style="display:none"></div>
+
+    <div id="statsWrap" style="display:none">
+      <div class="stats-row">
+        <div class="stat-cell"><div class="stat-n sn-white" id="s-total">0</div><div class="stat-l">Total Found</div></div>
+        <div class="stat-cell"><div class="stat-n sn-red" id="s-high">0</div><div class="stat-l">High Risk</div></div>
+        <div class="stat-cell"><div class="stat-n sn-yellow" id="s-med">0</div><div class="stat-l">Medium Risk</div></div>
+        <div class="stat-cell"><div class="stat-n sn-green" id="s-low">0</div><div class="stat-l">Looks Legit</div></div>
+        <div class="stat-cell"><div class="stat-n sn-orange" id="s-avg">0</div><div class="stat-l">Avg Days Posted</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-bar-label">Work Type</div>
+        <div class="work-tabs">
+          <button class="wtab active" onclick="setWorkType('all',this)">All</button>
+          <button class="wtab" onclick="setWorkType('remote',this)">🏠 Remote</button>
+          <button class="wtab" onclick="setWorkType('hybrid',this)">🔀 Hybrid</button>
+          <button class="wtab" onclick="setWorkType('inperson',this)">🏢 In-Person</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="filterWrap" style="display:none">
+      <div class="result-row">
+        <div class="result-count" id="resultCount"></div>
+        <div class="tabs">
+          <button class="tab active" onclick="applyFilter('all',this)">All</button>
+          <button class="tab" onclick="applyFilter('high',this)">👻 High Risk</button>
+          <button class="tab" onclick="applyFilter('medium',this)">⚠️ Medium</button>
+          <button class="tab" onclick="applyFilter('low',this)">✅ Legit</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="results">
+      <div class="state"><div class="state-em">👻</div><div class="state-h">Ready to Hunt</div><div class="state-p">Enter a job title, company, or keywords above and hit Search.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FAQ ══ -->
+<div class="page" id="pg-faq">
+  <div class="faq-wrap">
+    <div class="label">Got Questions?</div>
+    <h1 class="section-title">Frequently Asked Questions</h1>
+    <p class="section-sub" style="margin-bottom:40px">Everything you need to know about ghost jobs and how this tool works.</p>
+    <div class="faq-list">
+      <div class="faq-item open"><div class="faq-q" onclick="toggleFaq(this)">What is a ghost job? <em class="faq-chevron">+</em></div><div class="faq-a">A ghost job is a job posting that a company has <strong>no real intention of filling</strong> in the near term. Companies post ghost jobs to build passive candidate pipelines, give the appearance of growth, comply with internal HR processes, or simply because they forgot to take down old listings. Studies estimate that <strong>up to 1 in 5 job postings are ghost jobs</strong>.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How does Ghost Jobs detect them? <em class="faq-chevron">+</em></div><div class="faq-a">Ghost Jobs uses <strong>posting date as the primary signal</strong>. Most legitimate openings are filled within 30 to 45 days. When a posting has been sitting for 60 or more days with no update, it is a strong indicator that the role is stalled or was never intended to be filled.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is Ghost Jobs free to use? <em class="faq-chevron">+</em></div><div class="faq-a">Yes, completely free. We built this because job seekers deserve better transparency in the hiring process. If you find it useful, you can <a href="https://buymeacoffee.com/ghostjobsio" target="_blank">buy us a coffee</a> — but there is no requirement and no paywall ever.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Where does the job data come from? <em class="faq-chevron">+</em></div><div class="faq-a">Ghost Jobs pulls live data from the <strong>Adzuna Jobs API</strong>, which aggregates postings from thousands of employers and job boards across the United States. Data is updated regularly to ensure posting dates are as accurate as possible.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Should I never apply to a high risk job? <em class="faq-chevron">+</em></div><div class="faq-a">Not necessarily. Ghost Jobs is a <strong>signal, not a guarantee</strong>. A high risk score means proceed with caution and set realistic expectations. The goal is to help you prioritize your time, not eliminate opportunities entirely.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is the Company Ghost Score? <em class="faq-chevron">+</em></div><div class="faq-a">The Company Ghost Score looks at the <strong>pattern of postings across an entire organization</strong>. If a company consistently has many old, stale listings across multiple departments, that is a red flag that ghost job posting is a habit for them.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How do I report a bug or suggest a feature? <em class="faq-chevron">+</em></div><div class="faq-a">Use the <strong>Contact page</strong> to send us a note. We take every report seriously and actively use feedback to improve the tool.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONTACT ══ -->
+<div class="page" id="pg-contact">
+  <div class="contact-wrap">
+    <div class="label">Get In Touch</div>
+    <h1 class="section-title">Contact the Team</h1>
+    <p class="section-sub" style="margin-bottom:40px">Questions, bugs, ideas, or just want to say hi — we would love to hear from you.</p>
+
+    <div class="contact-grid">
+      <div class="contact-cards">
+        <div class="contact-card"><div class="cc-icon">👻</div><div><div class="cc-title">Report a Ghost Job</div><div class="cc-text">Found a posting we missed? Let us know and we will improve our detection.</div></div></div>
+        <div class="contact-card"><div class="cc-icon">🐛</div><div><div class="cc-title">Bug Reports</div><div class="cc-text">Something not working right? Send us a description and we will get it fixed fast.</div></div></div>
+        <div class="contact-card"><div class="cc-icon">💡</div><div><div class="cc-title">Feature Requests</div><div class="cc-text">Have an idea? We are actively building and want your input on what would make Ghost Jobs more useful.</div></div></div>
+        <div class="contact-card"><div class="cc-icon">☕</div><div><div class="cc-title">Support the Project</div><div class="cc-text">Ghost Jobs is free and always will be. Consider <a href="https://buymeacoffee.com/ghostjobsio" target="_blank">buying us a coffee</a> to keep the lights on.</div></div></div>
+      </div>
+
+      <!-- Netlify Form - Contact -->
+      <div class="contact-form-card">
+        <div class="form-title">Send Us a Message</div>
+        <div class="form-subtitle">We read every message and respond to all inquiries.</div>
+        <div id="contact-success" class="success-box" style="display:none">Message sent! We will get back to you shortly.</div>
+        <form name="contact" netlify netlify-honeypot="bot-field" onsubmit="submitForm(event,'contact','contact-success')">
+          <input type="hidden" name="form-name" value="contact" />
+          <p style="display:none"><input name="bot-field" /></p>
+          <div class="form-row"><label class="form-lbl">Your Name</label><input class="form-inp" type="text" name="name" placeholder="Jane Smith" required /></div>
+          <div class="form-row"><label class="form-lbl">Email Address</label><input class="form-inp" type="email" name="email" placeholder="jane@email.com" required /></div>
+          <div class="form-row">
+            <label class="form-lbl">Topic</label>
+            <select class="form-sel" name="topic">
+              <option value="">Select a topic</option>
+              <option>Report a Ghost Job</option>
+              <option>Bug Report</option>
+              <option>Feature Request</option>
+              <option>General Feedback</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-row"><label class="form-lbl">Message</label><textarea class="form-ta" name="message" placeholder="Tell us what is on your mind..." required></textarea></div>
+          <button type="submit" class="form-submit">Send Message</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Join the Team Section -->
+    <div class="join-section">
+      <div class="label">We Are Growing</div>
+      <h2 class="section-title">Join the Team</h2>
+      <p class="section-sub" style="margin-bottom:0">Ghost Jobs is built by a small team passionate about helping job seekers. If you want to be part of something meaningful, we would love to hear from you.</p>
+
+      <div class="join-grid">
+        <div class="join-info">
+          <h3>Open Roles</h3>
+          <p>We are always looking for talented people who care about the job seeker experience. All roles are remote and flexible.</p>
+          <div class="join-role"><div class="join-role-dot"></div><div class="join-role-name">Frontend Developer</div><div class="join-role-type">Remote · Volunteer</div></div>
+          <div class="join-role"><div class="join-role-dot"></div><div class="join-role-name">Data Analyst</div><div class="join-role-type">Remote · Volunteer</div></div>
+          <div class="join-role"><div class="join-role-dot"></div><div class="join-role-name">Community Manager</div><div class="join-role-type">Remote · Volunteer</div></div>
+          <div class="join-role"><div class="join-role-dot"></div><div class="join-role-name">General Application</div><div class="join-role-type">Remote · Open</div></div>
+        </div>
+
+        <!-- Netlify Form - Join Team -->
+        <div class="contact-form-card">
+          <div class="form-title">Apply to Join</div>
+          <div class="form-subtitle">Tell us a bit about yourself and why you want to be part of Ghost Jobs.</div>
+          <div id="join-success" class="success-box" style="display:none">Application received! We will be in touch.</div>
+          <form name="join-team" netlify netlify-honeypot="bot-field" onsubmit="submitForm(event,'join-team','join-success')">
+            <input type="hidden" name="form-name" value="join-team" />
+            <p style="display:none"><input name="bot-field" /></p>
+            <div class="form-row"><label class="form-lbl">Full Name</label><input class="form-inp" type="text" name="name" placeholder="Jane Smith" required /></div>
+            <div class="form-row"><label class="form-lbl">Email Address</label><input class="form-inp" type="email" name="email" placeholder="jane@email.com" required /></div>
+            <div class="form-row">
+              <label class="form-lbl">Role You Are Interested In</label>
+              <select class="form-sel" name="role">
+                <option value="">Select a role</option>
+                <option>Frontend Developer</option>
+                <option>Data Analyst</option>
+                <option>Community Manager</option>
+                <option>General Application</option>
+              </select>
+            </div>
+            <div class="form-row"><label class="form-lbl">LinkedIn or Portfolio URL</label><input class="form-inp" type="text" name="portfolio" placeholder="linkedin.com/in/yourname" /></div>
+            <div class="form-row"><label class="form-lbl">Why do you want to join Ghost Jobs?</label><textarea class="form-ta" name="message" placeholder="Tell us about yourself and what you would bring to the team..." required></textarea></div>
+            <button type="submit" class="form-submit">Submit Application</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-top">
+    <div>
+      <div class="footer-brand-name">Ghost<span>Jobs</span></div>
+      <p class="footer-tagline">Helping job seekers avoid ghost jobs and wasted applications. Free forever.</p>
+    </div>
+    <div>
+      <div class="footer-col-h">Navigate</div>
+      <ul class="footer-links">
+        <li><a onclick="go('home')">Home</a></li>
+        <li><a onclick="go('search')">Search Jobs</a></li>
+        <li><a onclick="go('faq')">FAQ</a></li>
+        <li><a onclick="go('contact')">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-h">Resources</div>
+      <ul class="footer-links">
+        <li><a onclick="go('faq')">What is a Ghost Job?</a></li>
+        <li><a onclick="go('contact')">Report a Ghost Job</a></li>
+        <li><a onclick="go('contact')">Join the Team</a></li>
+        <li><a href="https://buymeacoffee.com/ghostjobsio" target="_blank">Support the Project</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2025 <span>Ghost Jobs</span> — Because fake jobs waste real time.</div>
+    <a href="https://buymeacoffee.com/ghostjobsio" target="_blank" class="footer-coffee">☕ Buy Us a Coffee</a>
+  </div>
+</footer>
+
+<script>
+  let jobs = [];
+  let activeRisk = 'all';
+  let activeWork = 'all';
+
+  function go(pg) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-links a[id^="nl-"]').forEach(a => a.classList.remove('active'));
+    document.getElementById('pg-' + pg).classList.add('active');
+    const nl = document.getElementById('nl-' + pg);
+    if (nl) nl.classList.add('active');
+    window.scrollTo(0, 0);
+    return false;
+  }
+
+  function toggleFaq(el) { el.closest('.faq-item').classList.toggle('open'); }
+
+  function detectWorkType(job) {
+    const text = ((job.title || '') + ' ' + (job.description || '') + ' ' + (job.location?.display_name || '')).toLowerCase();
+    if (text.includes('remote') && !text.includes('hybrid')) return 'remote';
+    if (text.includes('hybrid')) return 'hybrid';
+    if (text.includes('in-person') || text.includes('on-site') || text.includes('onsite') || text.includes('in person')) return 'inperson';
+    return 'unknown';
+  }
+
+  function workBadge(type) {
+    if (type === 'remote') return '<div class="card-badge cb-remote">🏠 Remote</div>';
+    if (type === 'hybrid') return '<div class="card-badge cb-hybrid">🔀 Hybrid</div>';
+    if (type === 'inperson') return '<div class="card-badge cb-inperson">🏢 In-Person</div>';
+    return '';
+  }
+
+  function days(created) {
+    if (!created) return null;
+    return Math.floor((Date.now() - new Date(created)) / 86400000);
+  }
+
+  function risk(d) {
+    if (d === null) return { lvl:'low', label:'UNKNOWN', cls:'lvl-low', bc:'cb-low' };
+    if (d >= 60) return { lvl:'high', label:'👻 HIGH RISK', cls:'lvl-high', bc:'cb-high' };
+    if (d >= 30) return { lvl:'medium', label:'⚠️ MEDIUM RISK', cls:'lvl-medium', bc:'cb-medium' };
+    return { lvl:'low', label:'✅ LOOKS LEGIT', cls:'lvl-low', bc:'cb-low' };
+  }
+
+  function reason(d) {
+    if (d === null) return 'No posting date available.';
+    if (d >= 90) return `Posted ${d} days ago. Extremely high ghost job signal — most roles are filled within 45 days.`;
+    if (d >= 60) return `Posted ${d} days ago. Strong ghost job indicator — proceed with caution.`;
+    if (d >= 30) return `Posted ${d} days ago. Worth applying but the role may already have internal candidates.`;
+    return `Posted ${d} days ago. Fresh posting — this looks like an active, legitimate role.`;
+  }
+
+  async function doSearch() {
+    const title    = document.getElementById('f-title').value.trim();
+    const company  = document.getElementById('f-company').value.trim();
+    const industry = document.getElementById('f-industry').value.trim();
+    const location = document.getElementById('f-location').value.trim();
+
+    if (!title && !company && !industry) {
+      showErr('Enter at least one search term to find jobs.');
+      return;
+    }
+
+    hideEl('errBox');
+    document.getElementById('searchBtn').disabled = true;
+    hideEl('statsWrap'); hideEl('filterWrap');
+    document.getElementById('results').innerHTML = '<div class="state"><div class="state-em">👻</div><div class="state-h">Scanning for ghosts...</div><div class="loading-track"></div></div>';
+
+    try {
+      const url = `/.netlify/functions/search?title=${enc(title)}&company=${enc(company)}&industry=${enc(industry)}&location=${enc(location)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Search failed');
+      if (!data.results) throw new Error(data.exception || 'No results returned');
+
+      jobs = data.results.map(j => ({
+        ...j,
+        _days: days(j.created),
+        _risk: risk(days(j.created)),
+        _work: detectWorkType(j)
+      }));
+
+      const hi = jobs.filter(j => j._risk.lvl==='high').length;
+      const me = jobs.filter(j => j._risk.lvl==='medium').length;
+      const lo = jobs.filter(j => j._risk.lvl==='low').length;
+      const vd = jobs.filter(j => j._days!==null).map(j => j._days);
+      const avg = vd.length ? Math.round(vd.reduce((a,b)=>a+b,0)/vd.length) : 0;
+
+      set('s-total', jobs.length); set('s-high', hi); set('s-med', me); set('s-low', lo); set('s-avg', avg);
+      showEl('statsWrap'); showEl('filterWrap');
+
+      activeRisk = 'all'; activeWork = 'all';
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelector('.tab').classList.add('active');
+      document.querySelectorAll('.wtab').forEach(t => t.classList.remove('active'));
+      document.querySelector('.wtab').classList.add('active');
+
+      renderJobs();
+    } catch(e) {
+      document.getElementById('results').innerHTML = '';
+      showErr('Search failed: ' + e.message);
+    } finally {
+      document.getElementById('searchBtn').disabled = false;
+    }
+  }
+
+  function applyFilter(f, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    activeRisk = f;
+    renderJobs();
+  }
+
+  function setWorkType(w, el) {
+    document.querySelectorAll('.wtab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    activeWork = w;
+    renderJobs();
+  }
+
+  function renderJobs() {
+    let list = jobs;
+    if (activeRisk !== 'all') list = list.filter(j => j._risk.lvl === activeRisk);
+    if (activeWork !== 'all') list = list.filter(j => j._work === activeWork);
+
+    document.getElementById('resultCount').textContent = list.length + ' result' + (list.length!==1?'s':'');
+
+    if (!list.length) {
+      document.getElementById('results').innerHTML = '<div class="state"><div class="state-em">👻</div><div class="state-h">No results</div><div class="state-p">Try different filters or a broader search.</div></div>';
+      return;
+    }
+
+    document.getElementById('results').innerHTML = list.map((j,i) => `
+      <div class="job-card ${j._risk.cls}" style="animation-delay:${i*0.04}s">
+        <div class="card-row1">
+          <div class="card-title">${j.title || 'Untitled Role'}</div>
+          <div class="card-badges">
+            <div class="card-badge ${j._risk.bc}">${j._risk.label}</div>
+            ${workBadge(j._work)}
+          </div>
+        </div>
+        <div class="card-meta">
+          ${j.company?.display_name?`<div class="cm"><span class="cm-sep"></span>${j.company.display_name}</div>`:''}
+          ${j.location?.display_name?`<div class="cm"><span class="cm-sep"></span>${j.location.display_name}</div>`:''}
+          ${j._days!==null?`<div class="cm"><span class="cm-sep"></span><span class="cm-days ${j._risk.lvl}">${j._days} days posted</span></div>`:''}
+          ${j.salary_min?`<div class="cm"><span class="cm-sep"></span>$${Math.round(j.salary_min/1000)}k${j.salary_max?` – $${Math.round(j.salary_max/1000)}k`:'+' }</div>`:''}
+        </div>
+        <div class="card-reason">${reason(j._days)}</div>
+        ${j.redirect_url?`<a class="card-link" href="${j.redirect_url}" target="_blank">View Posting →</a>`:''}
+      </div>`).join('');
+  }
+
+  async function submitForm(e, formName, successId) {
+    e.preventDefault();
+    const form = e.target;
+    const data = new FormData(form);
+    try {
+      await fetch('/', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: new URLSearchParams(data).toString() });
+      form.reset();
+      document.getElementById(successId).style.display = 'block';
+      setTimeout(() => { document.getElementById(successId).style.display = 'none'; }, 6000);
+    } catch(err) {
+      alert('Something went wrong. Please try again.');
+    }
+  }
+
+  function enc(v) { return encodeURIComponent(v||''); }
+  function showEl(id) { document.getElementById(id).style.display = 'block'; }
+  function hideEl(id) { document.getElementById(id).style.display = 'none'; }
+  function showErr(msg) { const el=document.getElementById('errBox'); el.style.display='block'; el.textContent=msg; }
+  function set(id, v) { document.getElementById(id).textContent = v; }
+
+  document.addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
+</script>
+</body>
+</html>
